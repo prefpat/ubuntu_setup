@@ -150,9 +150,11 @@ for arg in "$@"; do
     case "$arg" in
         base)  setup_base ;;
         dev)   setup_dev ;;
+        bureau) setup_bureau ;;
         media) setup_media ;;
         all)
             setup_base
+            setup_bureau
             setup_dev
             setup_media
             ;;
