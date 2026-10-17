@@ -42,6 +42,29 @@ install_chrome() {
     fi
 }
 
+install_vscode() {
+    if command -v code &>/dev/null; then
+        echo "[OK] VS Code est déjà installé."
+    else
+        echo "[>>] Configuration du dépôt et installation de VS Code..."
+        
+        # Dépendances requises pour ajouter le dépôt HTTPS
+        sudo apt-get install -y wget gpg apt-transport-https
+
+        # Clé GPG officielle Microsoft
+        wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /tmp/packages.microsoft.gpg
+        sudo install -D -o root -g root -m 644 /tmp/packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
+        rm -f /tmp/packages.microsoft.gpg
+
+        # Ajout de la source APT
+        echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+
+        # Installation du paquet
+        sudo apt-get update -y
+        sudo apt-get install -y code
+    fi
+}
+
 # Fonction pour Termius (via Snap si disponible, ou .deb direct)
 install_termius() {
     if command -v termius-app &>/dev/null || command -v termius &>/dev/null; then
@@ -69,6 +92,7 @@ for arg in "$@"; do
             ;;
         dev)
             install_apt_list "$SCRIPT_DIR/packages/dev.list"
+            install_vscode
             ;;
         media)
             install_apt_list "$SCRIPT_DIR/packages/media.list"
@@ -77,6 +101,7 @@ for arg in "$@"; do
             install_apt_list "$SCRIPT_DIR/packages/base.list"
             install_chrome
             install_termius
+            install_vscode
             install_apt_list "$SCRIPT_DIR/packages/dev.list"
             [[ -f "$SCRIPT_DIR/packages/media.list" ]] && install_apt_list "$SCRIPT_DIR/packages/media.list"
             ;;
@@ -88,4 +113,4 @@ for arg in "$@"; do
     esac
 done
 
-echo "[+] Terminé !"
+echo "[+] Terminé !!"
