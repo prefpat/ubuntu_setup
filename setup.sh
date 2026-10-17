@@ -136,7 +136,7 @@ for arg in "$@"; do
             ;;
         bureau)
             install_apt_list "$SCRIPT_DIR/packages/bureau.list"
-            install_citrix() {
+            install_citrix
             ;;
         media)
             install_apt_list "$SCRIPT_DIR/packages/media.list"
