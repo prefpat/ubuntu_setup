@@ -120,38 +120,44 @@ install_citrix() {
     echo "[OK] Installation de Citrix terminée."
 }
 
+# Fonctions de regroupement par profil
+setup_base() {
+    echo "=== Profil : BASE ==="
+    install_apt_list "$SCRIPT_DIR/packages/base.list"
+    install_chrome
+}
 
-# Menu d'options / Arguments
-echo "=== Sélection des profils à installer ==="
+setup_bureau() {
+    echo "=== Profil : BUREAU ==="
+    install_apt_list "$SCRIPT_DIR/packages/bureau.list"
+    install_citrix
+}
+
+setup_dev() {
+    echo "=== Profil : DEV ==="
+    install_apt_list "$SCRIPT_DIR/packages/dev.list"
+    install_termius
+    install_vscode
+}
+
+setup_media() {
+    echo "=== Profil : MEDIA ==="
+    [[ -f "$SCRIPT_DIR/packages/media.list" ]] && install_apt_list "$SCRIPT_DIR/packages/media.list"
+}
+
+# Gestion des arguments
 for arg in "$@"; do
     case "$arg" in
-        base)
-            install_apt_list "$SCRIPT_DIR/packages/base.list"
-            install_chrome
-            install_termius
-            ;;
-        dev)
-            install_apt_list "$SCRIPT_DIR/packages/dev.list"
-            install_vscode
-            ;;
-        bureau)
-            install_apt_list "$SCRIPT_DIR/packages/bureau.list"
-            install_citrix
-            ;;
-        media)
-            install_apt_list "$SCRIPT_DIR/packages/media.list"
-            ;;
+        base)  setup_base ;;
+        dev)   setup_dev ;;
+        media) setup_media ;;
         all)
-            install_apt_list "$SCRIPT_DIR/packages/base.list"
-            install_chrome
-            install_termius
-            install_vscode
-            install_apt_list "$SCRIPT_DIR/packages/dev.list"
-            [[ -f "$SCRIPT_DIR/packages/media.list" ]] && install_apt_list "$SCRIPT_DIR/packages/media.list"
+            setup_base
+            setup_dev
+            setup_media
             ;;
         *)
-            echo "Profil inconnu : $arg"
-            echo "Profils disponibles : base, dev, media, all"
+            echo "[-] Profil inconnu : $arg"
             exit 1
             ;;
     esac
