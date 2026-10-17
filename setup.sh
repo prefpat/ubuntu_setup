@@ -135,8 +135,8 @@ for arg in "$@"; do
             install_vscode
             ;;
         bureau)
-            install_apt_list "$SCRIPT_DIR/packages/dev.list"
-            install_vscode
+            install_apt_list "$SCRIPT_DIR/packages/bureau.list"
+            install_citrix() {
             ;;
         media)
             install_apt_list "$SCRIPT_DIR/packages/media.list"
