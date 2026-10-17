@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Demande du mot de passe sudo au démarrage
+sudo -v
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Fonction pour installer une liste APT
+install_apt_list() {
+    local list_file="$1"
+    if [[ ! -f "$list_file" ]]; then
+        echo "[-] Fichier non trouvé : $list_file"
+        return 1
+    fi
+
+    echo "[+] Traitement de la liste : $list_file"
+    sudo apt-get update -y
+
+    # Filtrer les commentaires (#) et les lignes vides
+    grep -vE '^\s*#|^\s*$' "$list_file" | while read -r pkg; do
+        if dpkg -s "$pkg" &>/dev/null; then
+            echo "  [OK] $pkg est déjà installé."
+        else
+            echo "  [>>] Installation de $pkg..."
+            sudo apt-get install -y "$pkg"
+        fi
+    done
+}
+
+# Fonction pour Google Chrome (installation .deb officiel)
+install_chrome() {
+    if command -v google-chrome &>/dev/null; then
+        echo "[OK] Google Chrome est déjà installé."
+    else
+        echo "[>>] Installation de Google Chrome..."
+        tmp_deb=$(mktemp /tmp/chrome-XXXXXX.deb)
+        wget -q "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" -O "$tmp_deb"
+        sudo apt-get install -y "$tmp_deb"
+        rm -f "$tmp_deb"
+    fi
+}
+
+# Fonction pour Termius (via Snap si disponible, ou .deb direct)
+install_termius() {
+    if command -v termius-app &>/dev/null || command -v termius &>/dev/null; then
+        echo "[OK] Termius est déjà installé."
+    elif command -v snap &>/dev/null; then
+        echo "[>>] Installation de Termius via Snap..."
+        sudo snap install termius-app
+    else
+        echo "[>>] Installation de Termius via .deb..."
+        tmp_deb=$(mktemp /tmp/termius-XXXXXX.deb)
+        wget -q "https://autoupdate.termius.com/linux/Termius.deb" -O "$tmp_deb"
+        sudo apt-get install -y "$tmp_deb"
+        rm -f "$tmp_deb"
+    fi
+}
+
+# Menu d'options / Arguments
+echo "=== Sélection des profils à installer ==="
+for arg in "$@"; do
+    case "$arg" in
+        base)
+            install_apt_list "$SCRIPT_DIR/packages/base.list"
+            install_chrome
+            install_termius
+            ;;
+        dev)
+            install_apt_list "$SCRIPT_DIR/packages/dev.list"
+            ;;
+        media)
+            install_apt_list "$SCRIPT_DIR/packages/media.list"
+            ;;
+        all)
+            install_apt_list "$SCRIPT_DIR/packages/base.list"
+            install_chrome
+            install_termius
+            install_apt_list "$SCRIPT_DIR/packages/dev.list"
+            [[ -f "$SCRIPT_DIR/packages/media.list" ]] && install_apt_list "$SCRIPT_DIR/packages/media.list"
+            ;;
+        *)
+            echo "Profil inconnu : $arg"
+            echo "Profils disponibles : base, dev, media, all"
+            exit 1
+            ;;
+    esac
+done
+
+echo "[+] Terminé !"
