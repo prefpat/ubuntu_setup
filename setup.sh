@@ -81,6 +81,46 @@ install_termius() {
     fi
 }
 
+# Fonction pour Citrix Workspace (via .deb direct)
+install_citrix() {
+    if dpkg -s icaclient &>/dev/null; then
+        echo "[OK] Citrix Workspace est déjà installé."
+        return 0
+    fi
+
+    echo "[>>] Récupération de la dernière version de Citrix..."
+    
+    # Récupérer l'URL du dernier .deb x86_64 depuis la page officielle
+    LATEST_URL=$(curl -s "https://www.citrix.com/downloads/workspace-app/linux/workspace-app-for-linux-latest.html" \
+        | grep -oP 'https://downloads\.citrix\.com/\d+/[^"]+\.deb' \
+        | head -n 1)
+
+    if [[ -z "$LATEST_URL" ]]; then
+        echo "[-] Impossible de trouver le lien dynamique. Téléchargement manuel requis."
+        return 1
+    fi
+
+    tmp_deb=$(mktemp /tmp/citrix-XXXXXX.deb)
+    wget -q "$LATEST_URL" -O "$tmp_deb"
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$tmp_deb"
+    rm -f "$tmp_deb"
+
+
+    # Configuration non-interactive pour éviter les blocages de prompts debconf
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$tmp_deb"
+    rm -f "$tmp_deb"
+
+    # Lier les certificats SSL du système pour éviter les erreurs de certificat Citrix
+    if [[ -d /opt/Citrix/ICAClient/keystore/cacerts ]]; then
+        echo "[>>] Liaison des certificats racine système vers le magasin Citrix..."
+        sudo ln -sf /usr/share/ca-certificates/mozilla/* /opt/Citrix/ICAClient/keystore/cacerts/ 2>/dev/null || true
+        sudo c_rehash /opt/Citrix/ICAClient/keystore/cacerts/ 2>/dev/null || true
+    fi
+    
+    echo "[OK] Installation de Citrix terminée."
+}
+
+
 # Menu d'options / Arguments
 echo "=== Sélection des profils à installer ==="
 for arg in "$@"; do
@@ -91,6 +131,10 @@ for arg in "$@"; do
             install_termius
             ;;
         dev)
+            install_apt_list "$SCRIPT_DIR/packages/dev.list"
+            install_vscode
+            ;;
+        bureau)
             install_apt_list "$SCRIPT_DIR/packages/dev.list"
             install_vscode
             ;;
