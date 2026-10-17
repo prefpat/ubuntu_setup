@@ -1,0 +1,7 @@
+curl
+git
+wget
+build-essential
+htop
+tmux
+gnupg
