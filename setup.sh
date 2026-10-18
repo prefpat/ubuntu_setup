@@ -120,6 +120,37 @@ install_citrix() {
     echo "[OK] Installation de Citrix terminée."
 }
 
+install_lamp_stack() {
+    if dpkg -s apache2 &>/dev/null && command -v php &>/dev/null; then
+        echo "[OK] Apache et PHP sont déjà installés."
+        return 0
+    fi
+
+    echo "[>>] Installation du serveur web Apache et de PHP..."
+    
+    sudo apt-get update -y
+    sudo apt-get install -y \
+        apache2 \
+        php \
+        libapache2-mod-php \
+        php-cli \
+        php-curl \
+        php-mbstring \
+        php-xml \
+        php-zip \
+        php-mysql
+
+    # Activation du module rewrite d'Apache et redémarrage du service
+    echo "[>>] Configuration des modules Apache..."
+    sudo a2enmod rewrite
+    sudo systemctl restart apache2
+    sudo systemctl enable apache2
+
+    echo "[OK] Apache et PHP configurés et démarrés."
+}
+
+
+
 # Fonctions de regroupement par profil
 setup_base() {
     echo "=== Profil : BASE ==="
@@ -138,6 +169,7 @@ setup_dev() {
     install_apt_list "$SCRIPT_DIR/packages/dev.list"
     install_termius
     install_vscode
+    install_lamp_stack
 }
 
 setup_media() {
