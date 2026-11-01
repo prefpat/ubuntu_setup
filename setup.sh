@@ -67,10 +67,10 @@ install_chrome() {
 }
 
 
-# Fonction pour Google Chrome (installation .deb officiel)
+# Fonction pour 1Password (installation .deb officiel)
 install_1Password() {
-    if command -v google-chrome &>/dev/null; then
-        echo "[OK] Google Chrome est déjà installé."
+    if command -v op  &>/dev/null; then
+        echo "[OK] 1Password est déjà installé."
     else
         echo "[>>] Installation de 1Password Cli..."
         tmp_deb=$(mktemp /tmp/1password-XXXXXX.deb)
