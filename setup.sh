@@ -7,6 +7,10 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+######################################
+# Installer pour le regroupement BASE
+######################################
+
 # Fonction pour installer une liste APT
 install_apt_list() {
     local list_file="$1"
@@ -42,46 +46,27 @@ install_chrome() {
     fi
 }
 
-install_vscode() {
-    if command -v code &>/dev/null; then
-        echo "[OK] VS Code est déjà installé."
+# Fonction pour Espanso (installation via .deb officiel)
+install_Espanso() {
+    if command -v espanso &>/dev/null; then
+        echo "[OK] Espanso est déjà installé."
     else
-        echo "[>>] Configuration du dépôt et installation de VS Code..."
-        
-        # Dépendances requises pour ajouter le dépôt HTTPS
-        sudo apt-get install -y wget gpg apt-transport-https
-
-        # Clé GPG officielle Microsoft
-        wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /tmp/packages.microsoft.gpg
-        sudo install -D -o root -g root -m 644 /tmp/packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
-        rm -f /tmp/packages.microsoft.gpg
-
-        # Ajout de la source APT
-        echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
-
-        # Installation du paquet
-        sudo apt-get update -y
-        sudo apt-get install -y code
-    fi
-}
-
-# Fonction pour Termius (via Snap si disponible, ou .deb direct)
-install_termius() {
-    if command -v termius-app &>/dev/null || command -v termius &>/dev/null; then
-        echo "[OK] Termius est déjà installé."
-    elif command -v snap &>/dev/null; then
-        echo "[>>] Installation de Termius via Snap..."
-        sudo snap install termius-app
-    else
-        echo "[>>] Installation de Termius via .deb..."
-        tmp_deb=$(mktemp /tmp/termius-XXXXXX.deb)
-        wget -q "https://autoupdate.termius.com/linux/Termius.deb" -O "$tmp_deb"
+        echo "[>>] Installation de Espanso..."      
+        tmp_deb=$(mktemp /tmp/espanso-XXXXXX.deb)
+        wget https://github.com/espanso/espanso/releases/latest/download/espanso-debian-wayland-amd64.deb -O "$tmp_deb"
         sudo apt-get install -y "$tmp_deb"
         rm -f "$tmp_deb"
     fi
 }
 
+
+######################################
+# Installer pour le regroupement BUREAU
+######################################
+
+
 # Fonction pour Citrix Workspace (via .deb direct)
+############################################################################
 install_citrix() {
     if dpkg -s icaclient &>/dev/null; then
         echo "[OK] Citrix Workspace est déjà installé."
@@ -120,6 +105,12 @@ install_citrix() {
     echo "[OK] Installation de Citrix terminée."
 }
 
+######################################
+# Installer pour le regroupement DEV
+######################################
+
+# Fonction pour installer le serveur web Apache et PHP
+############################################################################
 install_lamp_stack() {
     if dpkg -s apache2 &>/dev/null && command -v php &>/dev/null; then
         echo "[OK] Apache et PHP sont déjà installés."
@@ -149,9 +140,55 @@ install_lamp_stack() {
     echo "[OK] Apache et PHP configurés et démarrés."
 }
 
+# Fonction pour MIcorosoft Visual Studio Code (VS Code)
+############################################################################
+install_vscode() {
+    if command -v code &>/dev/null; then
+        echo "[OK] VS Code est déjà installé."
+    else
+        echo "[>>] Configuration du dépôt et installation de VS Code..."
+        
+        # Dépendances requises pour ajouter le dépôt HTTPS
+        sudo apt-get install -y wget gpg apt-transport-https
+
+        # Clé GPG officielle Microsoft
+        wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /tmp/packages.microsoft.gpg
+        sudo install -D -o root -g root -m 644 /tmp/packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
+        rm -f /tmp/packages.microsoft.gpg
+
+        # Ajout de la source APT
+        echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+
+        # Installation du paquet
+        sudo apt-get update -y
+        sudo apt-get install -y code
+    fi
+}
+
+# Fonction pour Termius (via Snap si disponible, ou .deb direct)
+############################################################################
+install_termius() {
+    if command -v termius-app &>/dev/null || command -v termius &>/dev/null; then
+        echo "[OK] Termius est déjà installé."
+    elif command -v snap &>/dev/null; then
+        echo "[>>] Installation de Termius via Snap..."
+        sudo snap install termius-app
+    else
+        echo "[>>] Installation de Termius via .deb..."
+        tmp_deb=$(mktemp /tmp/termius-XXXXXX.deb)
+        wget -q "https://autoupdate.termius.com/linux/Termius.deb" -O "$tmp_deb"
+        sudo apt-get install -y "$tmp_deb"
+        rm -f "$tmp_deb"
+    fi
+}
+
+######################################
+# Installer pour le regroupement MEDIA
+######################################
 
 
 # Fonctions de regroupement par profil
+############################################################################
 setup_base() {
     echo "=== Profil : BASE ==="
     install_apt_list "$SCRIPT_DIR/packages/base.list"
