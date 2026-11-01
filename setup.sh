@@ -66,8 +66,8 @@ install_chrome() {
     fi
 }
 
-# Fonction pour Espanso (installation via .deb officiel)
-install_Espanso() {
+# Fonction pour Espanso Wayland (installation via .deb officiel)
+install_Espanso_Wayland() {
     if command -v espanso &>/dev/null; then
         echo "[OK] Espanso est déjà installé."
     else
@@ -85,6 +85,24 @@ install_Espanso() {
     fi
 }
 
+# Fonction pour Espanso X11 (installation via .deb officiel)
+install_Espanso_X11() {
+    if command -v espanso &>/dev/null; then
+        echo "[OK] Espanso est déjà installé."
+    else
+        echo "[>>] Installation de Espanso..."      
+        tmp_deb=$(mktemp /tmp/espanso-XXXXXX.deb)
+        wget https://github.com/espanso/espanso/releases/latest/download/espanso-debian-x11-amd64.deb -O "$tmp_deb"
+        sudo apt-get install -y "$tmp_deb"
+        rm -f "$tmp_deb"
+
+        # Register espanso as a systemd service (required only once)
+        espanso service register
+        
+        # Start espanso
+        espanso start        
+    fi
+}
 
 ######################################
 # Installer pour le regroupement BUREAU
@@ -219,6 +237,7 @@ setup_base() {
     echo "=== Profil : BASE ==="
     install_apt_list "$SCRIPT_DIR/packages/base.list"
     install_chrome
+    install_Espanso_Wayland
 }
 
 setup_bureau() {
