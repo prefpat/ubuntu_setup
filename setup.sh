@@ -66,6 +66,21 @@ install_chrome() {
     fi
 }
 
+
+# Fonction pour Google Chrome (installation .deb officiel)
+install_1Password() {
+    if command -v google-chrome &>/dev/null; then
+        echo "[OK] Google Chrome est déjà installé."
+    else
+        echo "[>>] Installation de 1Password Cli..."
+        tmp_deb=$(mktemp /tmp/1password-XXXXXX.deb)
+        curl -sSfo $tmp_deb https://downloads.1password.com/linux/debian/amd64/stable/1password-cli-amd64-latest.deb
+        sudo dpkg -i $tmp_deb
+        rm $tmp_deb        
+    fi
+}
+
+
 # Fonction pour Espanso Wayland (installation via .deb officiel)
 install_Espanso_Wayland() {
     if command -v espanso &>/dev/null; then
