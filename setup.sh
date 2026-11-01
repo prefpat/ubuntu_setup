@@ -1,11 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Demande du mot de passe sudo au démarrage
-sudo -v
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APT_UPDATED=0
+SUDO_KEEPALIVE_PID=""
+
+ensure_sudo() {
+    if [[ -z "$SUDO_KEEPALIVE_PID" ]]; then
+        sudo -v
+        while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+        SUDO_KEEPALIVE_PID=$!
+        trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT
+    fi
+}
+
+update_apt_cache() {
+    if [[ "$APT_UPDATED" -eq 0 ]]; then
+        sudo apt-get update -y
+        APT_UPDATED=1
+    fi
+}
+
+install_apt_package() {
+    local pkg="$1"
+    update_apt_cache
+    if dpkg -s "$pkg" &>/dev/null; then
+        echo "  [OK] $pkg est déjà installé."
+    else
+        echo "  [>>] Installation de $pkg..."
+        sudo apt-get install -y "$pkg"
+    fi
+}
 
 ######################################
 # Installer pour le regroupement BASE
@@ -20,17 +45,12 @@ install_apt_list() {
     fi
 
     echo "[+] Traitement de la liste : $list_file"
-    sudo apt-get update -y
+    update_apt_cache
 
     # Filtrer les commentaires (#) et les lignes vides
-    grep -vE '^\s*#|^\s*$' "$list_file" | while read -r pkg; do
-        if dpkg -s "$pkg" &>/dev/null; then
-            echo "  [OK] $pkg est déjà installé."
-        else
-            echo "  [>>] Installation de $pkg..."
-            sudo apt-get install -y "$pkg"
-        fi
-    done
+    while IFS= read -r pkg; do
+        install_apt_package "$pkg"
+    done < <(sed -E 's/^[[:space:]]*//; s/[[:space:]]*$//' "$list_file" | grep -vE '^(#|$)')
 }
 
 # Fonction pour Google Chrome (installation .deb officiel)
@@ -119,7 +139,7 @@ install_lamp_stack() {
 
     echo "[>>] Installation du serveur web Apache et de PHP..."
     
-    sudo apt-get update -y
+    update_apt_cache
     sudo apt-get install -y \
         apache2 \
         php \
@@ -160,7 +180,7 @@ install_vscode() {
         echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
 
         # Installation du paquet
-        sudo apt-get update -y
+        update_apt_cache
         sudo apt-get install -y code
     fi
 }
@@ -214,22 +234,152 @@ setup_media() {
     [[ -f "$SCRIPT_DIR/packages/media.list" ]] && install_apt_list "$SCRIPT_DIR/packages/media.list"
 }
 
-# Gestion des arguments
-for arg in "$@"; do
-    case "$arg" in
-        base)  setup_base ;;
-        dev)   setup_dev ;;
-        bureau) setup_bureau ;;
-        media) setup_media ;;
-        all)
+build_options() {
+    OPTIONS_LABELS=()
+    OPTIONS_ACTIONS=()
+    local profile function_name list_file pkg
+    local -A seen_packages=()
+
+    for profile in base bureau dev media; do
+        OPTIONS_LABELS+=("Profil : $profile")
+        OPTIONS_ACTIONS+=("profile:$profile")
+    done
+
+    while IFS= read -r function_name; do
+        [[ "$function_name" == "install_apt_list" || "$function_name" == "install_apt_package" ]] && continue
+        OPTIONS_LABELS+=("Application : ${function_name#install_}")
+        OPTIONS_ACTIONS+=("function:$function_name")
+    done < <(declare -F | awk '{print $3}' | grep '^install_')
+
+    for list_file in "$SCRIPT_DIR"/packages/*.list; do
+        [[ -f "$list_file" ]] || continue
+        while IFS= read -r pkg; do
+            [[ -n "${seen_packages[$pkg]:-}" ]] && continue
+            seen_packages["$pkg"]=1
+            OPTIONS_LABELS+=("Paquet : $pkg")
+            OPTIONS_ACTIONS+=("package:$pkg")
+        done < <(sed -E 's/^[[:space:]]*//; s/[[:space:]]*$//' "$list_file" | grep -vE '^(#|$)')
+    done
+}
+
+list_options() {
+    local i
+    build_options
+    printf 'Options disponibles :\n'
+    for i in "${!OPTIONS_LABELS[@]}"; do
+        printf '  %-3s %s\n' "$((i + 1))" "${OPTIONS_LABELS[$i]}"
+    done
+    printf '  all  Tous les profils (également : app:<nom>, nom du paquet)\n'
+}
+
+run_action() {
+    local action="$1"
+    case "$action" in
+        profile:base) setup_base ;;
+        profile:bureau) setup_bureau ;;
+        profile:dev) setup_dev ;;
+        profile:media) setup_media ;;
+        profile:all)
             setup_base
             setup_bureau
             setup_dev
             setup_media
             ;;
+        function:*) "${action#function:}" ;;
+        package:*) install_apt_package "${action#package:}" ;;
         *)
-            echo "[-] Profil inconnu : $arg"
-            exit 1
+            echo "[-] Option inconnue : $action"
+            return 1
+            ;;
+    esac
+}
+
+run_interactive() {
+    local i choice index
+    local -a choices
+    build_options
+    printf 'Que souhaitez-vous installer ? Entrez les numéros séparés par des virgules :\n'
+    for i in "${!OPTIONS_LABELS[@]}"; do
+        printf '  %-3s %s\n' "$((i + 1))" "${OPTIONS_LABELS[$i]}"
+    done
+    printf '  all  Tous les profils\n'
+    read -r -p 'Sélection : ' choice
+    [[ -n "$choice" ]] || return 0
+    if [[ "$choice" == "all" ]]; then
+        ensure_sudo
+        run_action "profile:all"
+        return
+    fi
+    IFS=',' read -r -a choices <<< "$choice"
+    for index in "${choices[@]}"; do
+        if [[ ! "$index" =~ ^[0-9]+$ ]] || (( index < 1 || index > ${#OPTIONS_ACTIONS[@]} )); then
+            echo "[-] Sélection invalide : $index"
+            return 1
+        fi
+    done
+    ensure_sudo
+    for index in "${choices[@]}"; do
+        run_action "${OPTIONS_ACTIONS[$((index - 1))]}"
+    done
+}
+
+run_cli_selection() {
+    local selection action function_name
+    build_options
+    for selection in "$@"; do
+        action=""
+        case "$selection" in
+            all)
+                action="profile:all"
+                ;;
+            base|bureau|dev|media)
+                action="profile:$selection"
+                ;;
+            app:*)
+                function_name="install_${selection#app:}"
+                if declare -F "$function_name" >/dev/null; then
+                    action="function:$function_name"
+                fi
+                ;;
+            *)
+                for i in "${!OPTIONS_ACTIONS[@]}"; do
+                    if [[ "${OPTIONS_ACTIONS[$i]}" == "package:$selection" ]]; then
+                        action="${OPTIONS_ACTIONS[$i]}"
+                        break
+                    fi
+                done
+                ;;
+        esac
+        if [[ -z "$action" ]]; then
+            echo "[-] Option inconnue : $selection"
+            list_options
+            return 1
+        fi
+        ensure_sudo
+        run_action "$action"
+    done
+}
+
+if [[ "$#" -eq 0 ]]; then
+    run_interactive
+    exit
+fi
+
+if [[ "$#" -eq 1 && "$1" == "--list" ]]; then
+    list_options
+    exit
+fi
+
+if [[ "$#" -eq 1 && "$1" == "--interactive" ]]; then
+    run_interactive
+    exit
+fi
+
+# Gestion des arguments
+for arg in "$@"; do
+    case "$arg" in
+        base|dev|bureau|media|all|app:*|*)
+            run_cli_selection "$arg"
             ;;
     esac
 done
