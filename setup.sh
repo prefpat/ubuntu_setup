@@ -76,6 +76,12 @@ install_Espanso() {
         wget https://github.com/espanso/espanso/releases/latest/download/espanso-debian-wayland-amd64.deb -O "$tmp_deb"
         sudo apt-get install -y "$tmp_deb"
         rm -f "$tmp_deb"
+
+        # Register espanso as a systemd service (required only once)
+        espanso service register
+        
+        # Start espanso
+        espanso start        
     fi
 }
 
