@@ -2,6 +2,7 @@ curl
 git
 wget
 build-essential
+openssh-server
 htop
 tmux
 gnupg
