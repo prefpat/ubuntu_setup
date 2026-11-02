@@ -66,6 +66,18 @@ install_chrome() {
     fi
 }
 
+# Fonction pour SSH (installation .deb officiel)
+install_SSH() {
+    if command -V  &>/dev/null; then
+        echo "[OK] SSHD est déjà installé."
+    else
+        echo "[>>] Installation de SSH Server..."
+        sudo apt install openssh-server -y        
+        sudo systemctl enable --now ssh
+        sudo ufw allow ssh
+    fi
+}
+
 
 # Fonction pour 1Password (installation .deb officiel)
 install_1Password() {
