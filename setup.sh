@@ -68,7 +68,7 @@ install_chrome() {
 
 # Fonction pour SSH (installation .deb officiel)
 install_SSH() {
-    if command -V  &>/dev/null; then
+    if command -V sshd &>/dev/null; then
         echo "[OK] SSHD est déjà installé."
     else
         echo "[>>] Installation de SSH Server..."
